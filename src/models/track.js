@@ -1,6 +1,9 @@
 module.exports = (sequelize, DataTypes) => {
   const track = sequelize.define('track', {
-    id: DataTypes.STRING,
+    id: {
+      type: DataTypes.STRING,
+      primaryKey: true,
+    },
     name: DataTypes.STRING,
     duration: DataTypes.FLOAT,
     timesPlayed: DataTypes.INTEGER,

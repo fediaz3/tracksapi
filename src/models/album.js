@@ -1,6 +1,9 @@
 module.exports = (sequelize, DataTypes) => {
   const album = sequelize.define('album', {
-    id: DataTypes.STRING,
+    id: {
+      type: DataTypes.STRING,
+      primaryKey: true,
+    },
     name: DataTypes.STRING,
     genre: DataTypes.STRING,
   }, {});
