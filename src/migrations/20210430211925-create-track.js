@@ -1,5 +1,5 @@
 module.exports = {
-  up: (queryInterface, Sequelize) => queryInterface.createTable('albums', {
+  up: (queryInterface, Sequelize) => queryInterface.createTable('tracks', {
     secondId: { //lo tendré porsiacaso, pero no lo voy a usar.
       allowNull: true,
       autoIncrement: true,
@@ -7,7 +7,7 @@ module.exports = {
     },
 
     // de aqui para abajo, es lo relevante
-    id: { // se lo tengo que dar en base 64, al crear el objeto album
+    id: { // se lo tengo que dar en base 64, al crear el objeto track
       primaryKey: true,
       allowNull: false,
       type: Sequelize.STRING,
@@ -16,8 +16,11 @@ module.exports = {
     name: {
       type: Sequelize.STRING,
     },
-    genre: {
-      type: Sequelize.STRING,
+    duration: {
+      type: Sequelize.FLOAT,
+    },
+    timesPlayed: {
+      type: Sequelize.INTEGER,
     },
 
     createdAt: {
@@ -30,5 +33,5 @@ module.exports = {
     },
   }),
 
-  down: (queryInterface) => queryInterface.dropTable('albums'),
+  down: (queryInterface) => queryInterface.dropTable('tracks'),
 };
