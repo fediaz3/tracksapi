@@ -8,8 +8,9 @@ module.exports = (sequelize, DataTypes) => {
     age: DataTypes.INTEGER,
   }, {});
 
-  artist.associate = function associate() {
+  artist.associate = function associate(models) {
     // associations can be defined here. This method receives a models parameter.
+    artist.hasMany(models.album)
   };
 
   return artist;

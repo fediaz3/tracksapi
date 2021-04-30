@@ -9,8 +9,9 @@ module.exports = (sequelize, DataTypes) => {
     timesPlayed: DataTypes.INTEGER,
   }, {});
 
-  track.associate = function associate() {
+  track.associate = function associate(models) {
     // associations can be defined here. This method receives a models parameter.
+    track.belongsTo(models.album)
   };
 
   return track;
