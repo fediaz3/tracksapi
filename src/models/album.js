@@ -11,6 +11,7 @@ module.exports = (sequelize, DataTypes) => {
   album.associate = function associate(models) {
     // associations can be defined here. This method receives a models parameter.
     album.belongsTo(models.artist) // si no funciona la recion agregar el Alias de la foreing key aqui.
+    album.hasMany(models.track)
   };
 
   // si la asociacion no funciona, probar con esta sintaxis:
