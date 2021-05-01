@@ -2,42 +2,46 @@ const KoaRouter = require('koa-router'); // para pedir la libreria koa-router
 const router = new KoaRouter();          // creo un router
 
 
-const calculateSelfURL = (currentURL, object, id) => {
-  url = `https://${currentURL}/${object}/${id}`
-  return url
-}
-
 const btoaEncode = (string) => {
   return Buffer.from(string).toString('base64')
 }
 const calculateId = (name) => {
   idCalculated = btoaEncode(name).slice(0, 22)
-  return idCalculated
+  return idCalculated // es un string
 }
 
-const calculateURLSArtist = (currentURL, idCalculated) => {
-  let selfURL = calculateSelfURL(currentURL,'artists', idCalculated)
-  let albumsURL = `${selfURL}/albums`
-  let tracksURL = `${selfURL}/tracks`
+const calculateURLSArtist = (currentURL, artistId) => {
+  let albumsURL = `http://${currentURL}/artists/${artistId}/albums`
+  let tracksURL = `http://${currentURL}/artists/${artistId}/tracks`
+  let selfURL = `http://${currentURL}/artists/${artistId}`
 
-  return [selfURL, albumsURL, tracksURL]
+  return [albumsURL, tracksURL, selfURL]
 
 }
 
-const calculateURLSAlbum = (currentURL, idCalculated) => {
-  let selfURL = calculateSelfURL(currentURL,'albums', idCalculated)
-  let artistURL = `${selfURL}/artists`
-  let tracksURL = `${selfURL}/tracks`
+const calculateURLSAlbum = (currentURL, albumId, artistId) => {
+  let artistURL = `http://${currentURL}/artists/${artistId}`
+  let tracksURL = `http://${currentURL}/albums/${albumId}/tracks`
+  let selfURL = `http://${currentURL}/albums/${albumId}`
 
   return [artistURL, tracksURL, selfURL]
-
 }
 
+// Aun no la uso:
+// const calculateURLSTrack = (currentURL, albumId, artistId, trackId) => {
+//   let artistURL = `http://${currentURL}/${artistId}`
+//   let albumURL = `http://${currentURL}/${albumId}`
+//   let selfURL = `http://${currentURL}/${trackId}`
+// 
+//   return [artistURL, albumURL, selfURL]
+// 
+// }
 
-async function loadArtist(ctx, next) {
+
+async function loadArtist (ctx, next) {
     ctx.state.artist = await ctx.orm.artist.findByPk(ctx.params.id);
     return next();
-  }
+}
   
 //GET ALL ARTISTS
 router.get('artists.list', '/', async(ctx, next) => {
@@ -45,7 +49,7 @@ router.get('artists.list', '/', async(ctx, next) => {
   
   artistsList = artistsList.map( x => { 
     currentURL = ctx.request.headers.host;
-    let [selfURL, albumsURL, tracksURL] = calculateURLSArtist(currentURL, idCalculated)
+    let [albumsURL, tracksURL, selfURL] = calculateURLSArtist(currentURL, x.id)
     return {name: x.name, age: x.age, albums: albumsURL, tracks: tracksURL, self: selfURL}
   })
   //console.log("Llegamos acá")
@@ -57,9 +61,10 @@ router.get('artists.list', '/', async(ctx, next) => {
 // GET ARTIST BY ID
 router.get('artists.list', '/:id', loadArtist, async(ctx, next) => {
   // console.log("Llegamos acá 2")
-  let {artist} = ctx.state
+  let { artist } = await ctx.state
   currentURL = ctx.request.headers.host;
-  let [selfURL, albumsURL, tracksURL] = calculateURLSArtist(currentURL, artist.id)
+  let [albumsURL, tracksURL, selfURL] = calculateURLSArtist(currentURL, artist.id)
+
   artist = { //asi omito el id, y le agrego las URLS
     name: artist.name, age: artist.age, albums: albumsURL,
     tracks: tracksURL, self: selfURL
@@ -115,63 +120,29 @@ router.post('artists.create', '/', async (ctx, next) => {
 
 //DELETE ARTIST:
 router.del('artists.delete', '/:id', loadArtist, async (ctx) => {
-  const {artist} = ctx.state;
-  await artist.destroy();
-  // ctx.redirect(ctx.router.url('artists.list')); // lo redirecciono a la lista de curevent
-});
-
-
-// CREATE ALBUM TO THIS ARTIST.
-router.post('artists.create', '/:id/albums', async (ctx, next) => {
-  
-  body = ctx.request.body
-  console.log("body que llega create album to this artist:", body, typeof(body))
-
-  //Calculate ID
-  let name = body.name
-  let idCalculated = calculateId(name)
-  body.id = idCalculated //agrego el par {id: idCalculated} al body
-  // body.artistID = ctx.request.headers.host
-
-  // OBTENER BIEN ESTA URL AQUI VOY************************************************************
-  // console.log(ctx.request.URL.pathname.slice(8, 31))
-  // console.log(ctx.request.URL.pathname.indexOf('/', 1))
-  // let currentURLObject = ctx.request.URL
-  // let idArtistFromURL = currentURLObject.pathname.slice(currentURLObject.pathname.indexOf('/', 2) + 1, 
-  //   currentURLObject.pathname.indexOf('/', 3))
-
-  //Calculate URLS
-  let currentURL = ctx.request.headers.host
-  let [artistURL, tracksURL, selfURL] = calculateURLSAlbum(currentURL, idCalculated)
-  // console.log(idCalculated, name, age, selfURL, albumsURL, tracksURL)
-  
-  // Creo el artista en el ORM
-  const album = await ctx.orm.album.build(body);
-  // console.log("artista previoa c rear:", artist)
-  
+  const {artist} = await ctx.state;
   try {
-    //guardo el artista en la bd con el orm
-    await album.save({ fields: ["id", "name", "genre"]});
-    // console.log("exitoso")
-    //Mostrar el artista creado:
-    response = {
-      id: album.id,
-      // falta agregar el artistID al cual agregué, pero 
-      artist_id: idArtistFromURL, //cambiar esto y poner album.artistId con la llave foreanea asociada antes
-      name: album.name,
-      genre: album.genre,
-      artist: artistURL, //calculados aqui mismo
-      tracks: tracksURL,
-      self: selfURL
-    }
-    ctx.body = response
-    await next()
-    
-  } catch (validationError) {
-    console.log("error: ", validationError.errors)
+    await artist.destroy();
   }
+  catch (validationError){
+    console.log("error:", validationError) 
+    //asi cuando no hay nadie no se cae la pgina AQUI ME FALTA TIRAR UN 404 o mensajito
+  }
+  
 });
 
+
+// CREATE ALBUM TO THIS ARTIST. <artistid>
+// TODAS LOS ROUTER, DE ESTE ARCHIVO artists.js, empiezan con /artists/
+// y sigue con el segundo parametro que pongo.
+// el primero, es solo un nombre si lo quiero llamar aquia adentro
+
+//aqui voy:
+// router.post('albums.create', '/:id/albums', loadArtist, async (ctx, next) => {
+// });
+
+
+// GET ALBUMS FROM THIS ARTIST <artistId>
 
 
 
