@@ -89,15 +89,61 @@ router.get('albums.list', '/', async(ctx, next) => {
 });
   
 
+// GET ALBUM given albumId
+router.get('albums.list', '/:id', loadAlbum, async(ctx, next) => {
+  let { album } = await ctx.state
 
+  currentURL = ctx.request.headers.host;
+  let [artistURL, tracksURL, selfURL] = calculateURLSAlbum(currentURL, album.id, album.artistId)
+
+  album = { //asi omito el id, y le agrego las URLS
+    id: album.id,
+    artist_id: album.artistId,
+    name: album.name,
+    genre: album.genre,
+    artist: artistURL,
+    tracks: tracksURL,
+    self: selfURL
+  }
+  ctx.body = album
+  await next()
+});
+
+
+
+// GET TRACK FROM THIS album <albumId> given
+router.get('tracks.list', '/:id/tracks', loadAlbum, async (ctx, next) => {
+
+  const { album } = await ctx.state;
+
+  let tracksList = await album.getTracks()
+
+  tracksList = tracksList.map( x => { 
+    let currentURL = ctx.request.headers.host;
+    let [artistURL, albumURL, selfURL] = calculateURLSTrack(currentURL, x.albumId, album.artistId, x.id)
+    return { id: x.id, album_id: x.albumId, name: x.name,
+      duration: x.duration, times_played: x.timesPlayed,
+      artist: artistURL, album: albumURL, self: selfURL
+    }
+  })
+  //console.log("Llegamos acá")
+  ctx.body = tracksList
+  await next()
+
+});
 
 
   
 //DELETE:
-router.del('albums.delete', '/:id', loadAlbum, async (ctx) => {
-  const {album} = ctx.state;
-  await album.destroy();
-  // ctx.redirect(ctx.router.url('albums.list')); // lo redirecciono a la lista de curevent
+router.del('tracks.delete', '/:id', loadAlbum, async (ctx, next) => {
+  const {album} = ctx.state
+  try {
+    await album.destroy(); 
+    ctx.body = ''
+    await next() 
+  } catch (validationError){
+    console.log("error:", validationError) 
+  }
 });
   
 
