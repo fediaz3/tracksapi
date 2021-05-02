@@ -153,6 +153,7 @@ router.post('artists.create', '/:id/albums', loadArtist, async (ctx, next) => {
     // Hago la asociacion: agrego el artistId, en la fila del album actual. en la tabla albums
     // tbm pude haber hecho manual, la asociacion.
     await album.setArtist(artist)
+    // console.log(album.getArtist()) // para ver la asociacion heca
     //Calculate URLS
     let currentURL = ctx.request.headers.host
     let [artistURL, tracksURL, selfURL] = calculateURLSAlbum(currentURL, album.id, artist.id)
@@ -177,17 +178,23 @@ router.post('artists.create', '/:id/albums', loadArtist, async (ctx, next) => {
 
 
 
-
-
-
-
-
-
 // GET ALBUMS FROM THIS ARTIST <artistId>
 
 //aqui voy:
-// router.post('albums.create', '/:id/albums', loadArtist, async (ctx, next) => {
-// });
+router.get('albums.create', '/:id/albums', loadArtist, async (ctx, next) => {
+  const { artist } = await ctx.state;
+  let albumsList = await artist.getAlbums()
+
+  albumsList = albumsList.map( x => { 
+    let currentURL = ctx.request.headers.host;
+    let [artistURL, tracksURL, selfURL] = calculateURLSAlbum(currentURL, x.id, artist.id)
+    return {name: x.name, genre: x.genre, artist: artistURL, tracks: tracksURL, self: selfURL}
+  })
+  //console.log("Llegamos acá")
+  ctx.body = albumsList
+  await next()
+
+});
 
 
 
