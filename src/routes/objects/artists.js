@@ -136,14 +136,58 @@ router.del('artists.delete', '/:id', loadArtist, async (ctx) => {
 // TODAS LOS ROUTER, DE ESTE ARCHIVO artists.js, empiezan con /artists/
 // y sigue con el segundo parametro que pongo.
 // el primero, es solo un nombre si lo quiero llamar aquia adentro
+// CREATE ALBUM TO THIS ARTIST.
+router.post('artists.create', '/:id/albums', loadArtist, async (ctx, next) => {
+  const { artist } = await ctx.state;
+  body = ctx.request.body
+  //Calculate ID
+  let name = `${body.name}:${artist.id}`
+  let idCalculated = calculateId(name)
+  body.id = idCalculated //agrego el par {id: idCalculated} al body
+  // Creo el artista en el ORM
+  const album = await ctx.orm.album.build(body);
 
-//aqui voy:
-// router.post('albums.create', '/:id/albums', loadArtist, async (ctx, next) => {
-// });
+  try {
+    //guardo el artista en la bd con el orm
+    await album.save({ fields: ["id", "name", "genre"]});
+    // Hago la asociacion: agrego el artistId, en la fila del album actual. en la tabla albums
+    // tbm pude haber hecho manual, la asociacion.
+    await album.setArtist(artist)
+    //Calculate URLS
+    let currentURL = ctx.request.headers.host
+    let [artistURL, tracksURL, selfURL] = calculateURLSAlbum(currentURL, album.id, artist.id)
+    // console.log(idCalculated, name, age, selfURL, albumsURL, tracksURL)
+
+    response = {
+      id: album.id,
+      artist_id: album.artistId, 
+      name: album.name,
+      genre: album.genre,
+      artist: artistURL, 
+      tracks: tracksURL,
+      self: selfURL
+    }
+    ctx.body = response
+    await next()
+
+  } catch (validationError) {
+    console.log("error: ", validationError.errors)
+  }
+});
+
+
+
+
+
+
+
 
 
 // GET ALBUMS FROM THIS ARTIST <artistId>
 
+//aqui voy:
+// router.post('albums.create', '/:id/albums', loadArtist, async (ctx, next) => {
+// });
 
 
 
