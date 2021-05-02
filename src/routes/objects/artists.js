@@ -143,6 +143,11 @@ router.del('artists.delete', '/:id', loadArtist, async (ctx, next) => {
       ctx.body = ''
       ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
       await next()
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
     }
     
   }
@@ -245,22 +250,38 @@ router.get('tracks.list', '/:id/tracks', loadArtist, async (ctx, next) => {
 router.put('tracks.play', '/:id/albums/play', loadArtist, async (ctx, next) => {
   const { artist } = await ctx.state;
 
-  let albumsList = await artist.getAlbums()
-
-  tracksListPromises = albumsList.map( async(x) => await x.getTracks())
-  let tracksList = await Promise.all(tracksListPromises)
-
-  tracksList = tracksList[0].map( async (x) => { 
-    // Reproducir el track:
-    let trackIncremented = await x.increment('timesPlayed', {by: 1})
-    // console.log("TrackIncremented:", trackIncremented) // es solo para verlo que se hizo
-  })
-
   try {
+    if (artist == null){ //notar que esto es solo si no existe el artista de artistID
+      // en otros casos va tirar 200 de todas formas.(aunque no tenga tracks)
+      throw new TypeError('objectDoesNotExist')
+    }
+  
+    let albumsList = await artist.getAlbums()
+  
+    tracksListPromises = albumsList.map( async(x) => await x.getTracks())
+    let tracksList = await Promise.all(tracksListPromises)
+  
+    tracksList = tracksList[0].map( async (x) => { 
+      // Reproducir el track:
+      let trackIncremented = await x.increment('timesPlayed', {by: 1})
+      // console.log("TrackIncremented:", trackIncremented) // es solo para verlo que se hizo
+    })
+
     ctx.body = ''
+    ctx.response.status = httpCodes.successCode['ok'] //retorna 200
     await next()
-  } catch (validationError) {
-    console.log("error: ", validationError)
+  } catch (error) {
+    if (error.message == "objectDoesNotExist") {
+      console.log('artista no encontrado')
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
+    }
   }
 });
 

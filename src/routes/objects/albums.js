@@ -139,20 +139,37 @@ router.get('tracks.list', '/:id/tracks', loadAlbum, async (ctx, next) => {
 router.put('tracks.play', '/:id/tracks/play', loadAlbum, async (ctx, next) => {
 
   const { album } = await ctx.state;
-
-  let tracksList = await album.getTracks()
-
-  tracksList = tracksList.map( async (x) => { 
-    // Reproducir el track:
-    let trackIncremented = await x.increment('timesPlayed', {by: 1})
-    // console.log("TrackIncremented:", trackIncremented) // es solo para verlo que se hizo
-  })
+  console.log("ALBUM:", album)
 
   try {
+    if (album == null){ //solo tira 404, en caso que el album no exista.
+      //notar que en el caso que el album exista y esté vacio -> no tira error
+      // y sale exitoso, a pesar de no tener tracks. (igual se pueden interpretar asi)
+      throw new TypeError('objectDoesNotExist')
+    }
+  
+    let tracksList = await album.getTracks()
+    tracksList = tracksList.map( async (x) => { 
+      // Reproducir el track:
+      let trackIncremented = await x.increment('timesPlayed', {by: 1})
+      // console.log("TrackIncremented:", trackIncremented) // es solo para verlo que se hizo
+    })
+
     ctx.body = ''
+    ctx.response.status = httpCodes.errorsCode['ok']
     await next()
-  } catch (validationError) {
-    console.log("error: ", validationError)
+  } catch (error) {
+    if (error.message == "objectDoesNotExist") {
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
+    }
+    
   }
 });
 
@@ -180,7 +197,14 @@ router.del('albums.delete', '/:id', loadAlbum, async (ctx, next) => {
       ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
       await next()
       
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
     }
+
+    
     
   }
 });

@@ -75,15 +75,28 @@ router.get('albums.list', '/:id', loadTrack, async(ctx, next) => {
 router.put('tracks.play', '/:id/play', loadTrack, async (ctx, next) => {
   const { track } = await ctx.state;
 
-  let trackIncremented = await track.increment('timesPlayed', {by: 1})
-  // console.log("Track Incremented:", track)
-
   try {
+    if (track == null){
+      throw new TypeError('objectDoesNotExist')
+    }
+    let trackIncremented = await track.increment('timesPlayed', {by: 1})
+    // console.log("Track Incremented:", track)
     ctx.body = ''
+    ctx.response.status = httpCodes.successCode['ok'] //retorna 200
     await next()
-  } catch (validationError) {
-    console.log("error: ", validationError)
+  } catch (error) {
+    if (error.message == "objectDoesNotExist") {
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
+    }
   }
+
 });
 
   
@@ -104,6 +117,11 @@ router.del('tracks.delete', '/:id', loadTrack, async (ctx, next) => {
       ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
       await next()
       // console.log("no existe el objecto")
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
     }
   }
 });
