@@ -67,9 +67,9 @@ router.get('artists.list', '/:id', loadArtist, async(ctx, next) => {
   currentURL = ctx.request.headers.host;
   let [albumsURL, tracksURL, selfURL] = calculateURLSArtist(currentURL, artist.id)
 
-  artist = { //asi omito el id, y le agrego las URLS
-    name: artist.name, age: artist.age, albums: albumsURL,
-    tracks: tracksURL, self: selfURL
+  artist = { 
+    id: artist.id, name: artist.name, age: artist.age, 
+    albums: albumsURL, tracks: tracksURL, self: selfURL
   }
   ctx.body = artist
   await next()
@@ -86,10 +86,6 @@ router.post('artists.create', '/', async (ctx, next) => {
   let idCalculated = calculateId(name)
   body.id = idCalculated //agrego el par {id: idCalculated} al body
 
-  //Calculate URLS
-  let currentURL = ctx.request.headers.host
-  let [selfURL, albumsURL, tracksURL] = calculateURLSArtist(currentURL, idCalculated)
-  // console.log(idCalculated, name, age, selfURL, albumsURL, tracksURL)
   // Creo el artista en el ORM
   const artist = await ctx.orm.artist.build(body);
   // console.log("artista previoa c rear:", artist)
@@ -97,9 +93,14 @@ router.post('artists.create', '/', async (ctx, next) => {
   try {
     //guardo el artista en la bd con el orm
     await artist.save({ fields: ["id", "name", "age"]});
-    // console.log("exitoso")
+  
+    //Calculate URLS
+    let currentURL = ctx.request.headers.host
+    let [albumsURL, tracksURL, selfURL] = calculateURLSArtist(currentURL, artist.id)
+
     //Mostrar el artista creado:
     response = {
+      id: artist.id,
       name: artist.name,
       age: artist.age,
       albums: albumsURL, //calculados aqui mismo
@@ -188,7 +189,7 @@ router.post('artists.create', '/:id/albums', loadArtist, async (ctx, next) => {
 
 
 
-// GET ALBUMS FROM THIS ARTIST <artistId>
+// GET ALBUMS given <artistId>
 router.get('albums.create', '/:id/albums', loadArtist, async (ctx, next) => {
   const { artist } = await ctx.state;
   let albumsList = await artist.getAlbums()
@@ -196,7 +197,8 @@ router.get('albums.create', '/:id/albums', loadArtist, async (ctx, next) => {
   albumsList = albumsList.map( x => { 
     let currentURL = ctx.request.headers.host;
     let [artistURL, tracksURL, selfURL] = calculateURLSAlbum(currentURL, x.id, artist.id)
-    return {name: x.name, genre: x.genre, artist: artistURL, tracks: tracksURL, self: selfURL}
+    return {id: x.id, artist_id: x.artistId, name: x.name, genre: x.genre, 
+      artist: artistURL, tracks: tracksURL, self: selfURL}
   })
   //console.log("Llegamos acá")
   ctx.body = albumsList
@@ -205,8 +207,7 @@ router.get('albums.create', '/:id/albums', loadArtist, async (ctx, next) => {
 });
 
 
-// GET ALL TRACKS FROM THIS ARTIST.
-// AQUI VOY*****************************************************************************
+// GET TRACKS given <artistId>
 router.get('tracks.list', '/:id/tracks', loadArtist, async (ctx, next) => {
   const { artist } = await ctx.state;
 
