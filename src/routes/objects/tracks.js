@@ -43,27 +43,43 @@ router.get('tracks.list', '/', async(ctx, next) => {
 // GET TRACK given TrackId
 router.get('albums.list', '/:id', loadTrack, async(ctx, next) => {
   let { track } = await ctx.state
-  let album  = await track.getAlbum()
-  let artist = await album.getArtist()
 
-  currentURL = ctx.request.headers.host;
-  let [artistURL, albumURL, selfURL] = calculateURLSTrack(currentURL, track.albumId, artist.id, track.id)
-
-  track = { //asi omito el id, y le agrego las URLS
-    id: track.id,
-    album_id: track.albumId,
-    name: track.name,
-    duration: track.duration,
-    times_played: track.timesPlayed,
-    artist: artistURL,
-    album: albumURL,
-    self: selfURL
-  }
+  
   try {
+    if (track == null){
+      throw new TypeError('objectDoesNotExist')
+    }
+    let album  = await track.getAlbum()
+    let artist = await album.getArtist()
+  
+    currentURL = ctx.request.headers.host;
+    let [artistURL, albumURL, selfURL] = calculateURLSTrack(currentURL, track.albumId, artist.id, track.id)
+  
+    track = { //asi omito el id, y le agrego las URLS
+      id: track.id,
+      album_id: track.albumId,
+      name: track.name,
+      duration: track.duration,
+      times_played: track.timesPlayed,
+      artist: artistURL,
+      album: albumURL,
+      self: selfURL
+    }
+
     ctx.body = track
     await next()
-  } catch(validationError){
-    console.log("error:", validationError)
+  } catch(error){
+    if (error.message == "objectDoesNotExist"){
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+      // console.log("no existe el objecto")
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
+    }
   }
   
 });

@@ -66,15 +66,37 @@ router.get('artists.list', '/', async(ctx, next) => {
 router.get('artists.list', '/:id', loadArtist, async(ctx, next) => {
   // console.log("Llegamos acá 2")
   let { artist } = await ctx.state
-  currentURL = ctx.request.headers.host;
-  let [albumsURL, tracksURL, selfURL] = calculateURLSArtist(currentURL, artist.id)
 
-  artist = { 
-    id: artist.id, name: artist.name, age: artist.age, 
-    albums: albumsURL, tracks: tracksURL, self: selfURL
+  try {
+    if (artist == null ){
+      throw new TypeError('objectDoesNotExist')
+    }
+    currentURL = ctx.request.headers.host;
+    let [albumsURL, tracksURL, selfURL] = calculateURLSArtist(currentURL, artist.id)
+  
+    artist = { 
+      id: artist.id, name: artist.name, age: artist.age, 
+      albums: albumsURL, tracks: tracksURL, self: selfURL
+    }
+    ctx.body = artist
+    ctx.response.status = httpCodes.successCode['ok'] // 200
+    await next()
+    
+  } catch (error) {
+    if (error.message == "objectDoesNotExist"){
+      console.log("no existe el artista")
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
+    }
+    
   }
-  ctx.body = artist
-  await next()
+  
 });
 
 
@@ -204,17 +226,37 @@ router.post('artists.create', '/:id/albums', loadArtist, async (ctx, next) => {
 // GET ALBUMS given <artistId>
 router.get('albums.create', '/:id/albums', loadArtist, async (ctx, next) => {
   const { artist } = await ctx.state;
-  let albumsList = await artist.getAlbums()
 
-  albumsList = albumsList.map( x => { 
-    let currentURL = ctx.request.headers.host;
-    let [artistURL, tracksURL, selfURL] = calculateURLSAlbum(currentURL, x.id, artist.id)
-    return {id: x.id, artist_id: x.artistId, name: x.name, genre: x.genre, 
-      artist: artistURL, tracks: tracksURL, self: selfURL}
-  })
-  //console.log("Llegamos acá")
-  ctx.body = albumsList
-  await next()
+  try {
+    if (artist == null){
+      throw new TypeError('objectDoesNotExist')
+    }
+    let albumsList = await artist.getAlbums()
+  
+    albumsList = albumsList.map( x => { 
+      let currentURL = ctx.request.headers.host;
+      let [artistURL, tracksURL, selfURL] = calculateURLSAlbum(currentURL, x.id, artist.id)
+      return {id: x.id, artist_id: x.artistId, name: x.name, genre: x.genre, 
+        artist: artistURL, tracks: tracksURL, self: selfURL}
+    })
+    //console.log("Llegamos acá")
+    ctx.body = albumsList
+    await next()
+  } catch (error){
+    if (error.message == "objectDoesNotExist"){
+      // console.log("no existe el album")
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+      
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
+    }
+  }
+  
 
 });
 
@@ -223,23 +265,39 @@ router.get('albums.create', '/:id/albums', loadArtist, async (ctx, next) => {
 router.get('tracks.list', '/:id/tracks', loadArtist, async (ctx, next) => {
   const { artist } = await ctx.state;
 
-  let albumsList = await artist.getAlbums()
-
-  tracksListPromises = albumsList.map( async(x) => await x.getTracks())
-  let tracksList = await Promise.all(tracksListPromises)
-
-  tracksList = tracksList[0].map( x => { 
-    let currentURL = ctx.request.headers.host;
-    let [artistURL, albumURL, selfURL] = calculateURLSTrack(currentURL, x.albumId, artist.id, x.id)
-    return {id: x.id, album_id: x.albumId, name: x.name, duration: x.duration,
-    times_played: x.timesPlayed, artist: artistURL, album: albumURL, self: selfURL}
-  })
-
   try {
+    if (artist == null){
+      throw new TypeError('objectDoesNotExist')
+    }
+  
+    let albumsList = await artist.getAlbums()
+  
+    tracksListPromises = albumsList.map( async(x) => await x.getTracks())
+    let tracksList = await Promise.all(tracksListPromises)
+  
+    tracksList = tracksList[0].map( x => { 
+      let currentURL = ctx.request.headers.host;
+      let [artistURL, albumURL, selfURL] = calculateURLSTrack(currentURL, x.albumId, artist.id, x.id)
+      return {id: x.id, album_id: x.albumId, name: x.name, duration: x.duration,
+      times_played: x.timesPlayed, artist: artistURL, album: albumURL, self: selfURL}
+    })
+
     ctx.body = tracksList
     await next()
-  } catch (validationError) {
-    console.log("error: ", validationError)
+
+  } catch (error) {
+    if (error.message == "objectDoesNotExist"){
+      // console.log("no existe el artista")
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+      
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
+    }
   }
 });
 
