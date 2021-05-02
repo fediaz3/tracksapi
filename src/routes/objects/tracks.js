@@ -70,14 +70,33 @@ router.get('albums.list', '/:id', loadTrack, async(ctx, next) => {
  
   
  
+// PLAY TRACK given <trackID>
+router.put('tracks.play', '/:id/play', loadTrack, async (ctx, next) => {
+  const { track } = await ctx.state;
+
+  let trackIncremented = await track.increment('timesPlayed', {by: 1})
+  // console.log("Track Incremented:", track)
+
+  try {
+    ctx.body = ''
+    await next()
+  } catch (validationError) {
+    console.log("error: ", validationError)
+  }
+});
+
   
-  
-  //DELETE:
-  router.del('tracks.delete', '/:id', loadTrack, async (ctx) => {
-    const {track} = ctx.state;
-    await track.destroy();
-    // ctx.redirect(ctx.router.url('tracks.list')); // lo redirecciono a la lista de curevent
-  });
+//DELETE TRACK given <trackId>
+router.del('tracks.delete', '/:id', loadTrack, async (ctx, next) => {
+  const { track } = ctx.state;
+  try {
+    await track.destroy(); 
+    ctx.body = ''
+    await next() 
+  } catch (validationError){
+    console.log("error:", validationError) 
+  }
+});
   
 
 
