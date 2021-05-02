@@ -119,10 +119,17 @@ router.post('artists.create', '/', async (ctx, next) => {
 });
 
 //DELETE ARTIST:
-router.del('artists.delete', '/:id', loadArtist, async (ctx) => {
+router.del('artists.delete', '/:id', loadArtist, async (ctx, next) => {
   const {artist} = ctx.state;
   try {
-    await artist.destroy(); //borra en cascada, pero tira un 404 nosé porqué
+    await artist.destroy(); 
+    // estas dos lineas de abajo, son clave para que no tire el 404, 
+    // cuando no corresponde 
+    // esta raro, pero sirve
+    ctx.body = ''
+    await next() 
+    //sin estas dos lineas tira 404, inclusive si borró bien el artista.
+
   // pendiente revisar.
   } catch (validationError){
     console.log("error:", validationError) 
@@ -197,6 +204,25 @@ router.get('albums.create', '/:id/albums', loadArtist, async (ctx, next) => {
 
 
 
+
+// reproduir las canciones de todos los albums del artista <artista_id>
+
+router.put('tracks.play', '/:id/albums/play', loadArtist, async (ctx, next) => {
+  const { artist } = await ctx.state;
+  console.log("reproducir")
+
+  // PENDIENTE: DPS DE CREAR LAS CANCIONES, LES PUEDO AUMENTAR EL TIMESPLAYED,
+  
+  try {
+    ctx.body = ''
+    await next()
+    // ctx.redirect(ctx.router.url(`artists.list/${1}`));
+  } catch (validationError) {
+    console.log("error: ", validationError)
+  }
+
+
+});
 
 
 
