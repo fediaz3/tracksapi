@@ -1,6 +1,8 @@
 const KoaRouter = require('koa-router'); // para pedir la libreria koa-router
 const router = new KoaRouter();          // creo un router
 
+const httpCodes = require('./httpCodes')
+
 
 const btoaEncode = (string) => {
   return Buffer.from(string).toString('base64')
@@ -125,19 +127,24 @@ router.post('artists.create', '/', async (ctx, next) => {
 router.del('artists.delete', '/:id', loadArtist, async (ctx, next) => {
   const {artist} = ctx.state;
   try {
-    await artist.destroy(); 
-    // estas dos lineas de abajo, son clave para que no tire el 404, 
-    // cuando no corresponde 
-    // esta raro, pero sirve
-    ctx.body = ''
-    await next() 
-    //sin estas dos lineas tira 404, inclusive si borró bien el artista.
+    if (artist == null) { //Si el album no existe de antes -> lanzar un error 404
+      throw new TypeError('objectDoesNotExist')
+    } 
 
-  // pendiente revisar.
-  } catch (validationError){
-    console.log("error:", validationError) 
-    // TypeError Cannot read property 'destroy' of null //asi no se se cae cuando 
-    // se trata de eliminar cuando no hay artistas.
+    await artist.destroy(); 
+    ctx.body = ''
+    ctx.response.status = httpCodes.successCode['objectDeleted']
+    await next() 
+
+  
+  } catch (error){
+    if (error.message == "objectDoesNotExist"){
+      console.log("no existe el objeto")
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+    }
+    
   }
   
 });
@@ -259,30 +266,6 @@ router.put('tracks.play', '/:id/albums/play', loadArtist, async (ctx, next) => {
 
 
 
-//EDIT:
-// router.get('artists.edit', '/:id/edit', loadArtist, async (ctx) => {
-//   const {artist} = ctx.state;
-//   // await ctx.render('artists/edit', {
-//   //   artist,
-//   //   submitEventPath: ctx.router.url('artists.update', { id: artist.id }),
-//   // });
-// });
-// 
-// //patch para EDIT:
-// router.patch('artists.update', '/:id', loadArtist, async (ctx) => {
-//   const {artist} = ctx.state;
-//   // try {
-//   //   const { role, name, email, phone } = ctx.request.body;
-//   //   await artist.update({ role, name, email, phone });
-//   //   ctx.redirect(ctx.router.url('artists.list'));
-//   // } catch (validationError) {
-//   //   await ctx.render('artists/edit', {
-//   //     artist,
-//   //     errors: validationError.errors,
-//   //     submitEventsPath: ctx.router.url('artists.update', { id: artist.id }),
-//   //   });
-//   // }
-// });
 
 
 

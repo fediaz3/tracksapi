@@ -1,6 +1,7 @@
 const KoaRouter = require('koa-router'); // para pedir la libreria koa-router
 const router = new KoaRouter();          // creo un router
 
+const httpCodes = require('./httpCodes')
 
 async function loadAlbum(ctx, next) {
     ctx.state.album = await ctx.orm.album.findByPk(ctx.params.id);
@@ -163,11 +164,24 @@ router.put('tracks.play', '/:id/tracks/play', loadAlbum, async (ctx, next) => {
 router.del('albums.delete', '/:id', loadAlbum, async (ctx, next) => {
   const {album} = ctx.state
   try {
+    if (album == null) { //Si el album no existe de antes -> lanzar un error 404
+      throw new TypeError('objectDoesNotExist')
+    } 
+
     await album.destroy(); 
     ctx.body = ''
+    ctx.response.status = httpCodes.successCode['objectDeleted']
     await next() 
-  } catch (validationError){
-    console.log("error:", validationError) 
+
+  } catch (error){
+    if (error.message == "objectDoesNotExist"){
+      // console.log("no existe el objeto")
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+      
+    }
+    
   }
 });
   

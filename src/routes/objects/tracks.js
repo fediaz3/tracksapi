@@ -1,6 +1,7 @@
 const KoaRouter = require('koa-router'); // para pedir la libreria koa-router
 const router = new KoaRouter();          // creo un router
 
+const httpCodes = require('./httpCodes')
 
 async function loadTrack(ctx, next) {
     ctx.state.track = await ctx.orm.track.findByPk(ctx.params.id);
@@ -90,11 +91,20 @@ router.put('tracks.play', '/:id/play', loadTrack, async (ctx, next) => {
 router.del('tracks.delete', '/:id', loadTrack, async (ctx, next) => {
   const { track } = ctx.state;
   try {
+    if (track == null) { //Si el track no existe antes -> lanzar un error 404
+      throw new TypeError('objectDoesNotExist')
+    } 
     await track.destroy(); 
     ctx.body = ''
+    ctx.response.status = httpCodes.successCode['objectDeleted']
     await next() 
-  } catch (validationError){
-    console.log("error:", validationError) 
+  } catch (error){
+    if (error.message == "objectDoesNotExist"){
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+      // console.log("no existe el objecto")
+    }
   }
 });
   
