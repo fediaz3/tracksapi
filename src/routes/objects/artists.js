@@ -1,4 +1,5 @@
 const KoaRouter = require('koa-router'); // para pedir la libreria koa-router
+const { number } = require('prop-types');
 const router = new KoaRouter();          // creo un router
 
 const httpCodes = require('./httpCodes')
@@ -103,18 +104,30 @@ router.get('artists.list', '/:id', loadArtist, async(ctx, next) => {
 //CREATE ARTIST
 router.post('artists.create', '/', async (ctx, next) => {
   
-  body = ctx.request.body
-  // console.log("body que llega:", body, typeof(body))
-  //Calculate ID
-  let name = body.name
-  let idCalculated = calculateId(name)
-  body.id = idCalculated //agrego el par {id: idCalculated} al body
-
-  // Creo el artista en el ORM
-  const artist = await ctx.orm.artist.build(body);
-  // console.log("artista previoa c rear:", artist)
-  
   try {
+    body = ctx.request.body
+
+    //Chequeando el input (tipos de datos) dados en el body
+    if (body.name == undefined || body.age == undefined 
+      || typeof(body.name) != 'string' || typeof(body.age) != 'number'){
+      throw new Error("badRequest")
+      
+    }
+    if (typeof(body.age) == 'number'){ //para sacar los "floats" en javascript
+      if (Number.isInteger(body.age) === false ){
+        throw new Error("badRequest")
+      }
+    }
+
+    // console.log("body que llega:", body, typeof(body))
+    //Calculate ID
+    let name = body.name
+    let idCalculated = calculateId(name)
+    body.id = idCalculated //agrego el par {id: idCalculated} al body
+  
+    // Creo el artista en el ORM
+    const artist = await ctx.orm.artist.build(body);
+    
     //guardo el artista en la bd con el orm
     await artist.save({ fields: ["id", "name", "age"]});
   
@@ -132,16 +145,46 @@ router.post('artists.create', '/', async (ctx, next) => {
       self: selfURL
     }
     ctx.body = response
+    ctx.response.status = httpCodes.successCode['objectCreated']
     await next()
-    // ctx.redirect(ctx.router.url(`artists.list/${1}`));
-  } catch (validationError) {
-    console.log("error: ", validationError.errors)
-    // voy a querer pasarle denuevo la vista
-    // await ctx.render('artists.new', {
-    //   artist,
-    //   errors: validationError.errors, //errores que se depliean arriba del formulario.
-    //   submitSupplierPath: ctx.router.url('artists.create'),
-    // });
+
+  } catch (error) {
+    //formato incorrecto en el input dado: error.name == "SequelizeDatabaseError" 
+    // faltan campos: error.message == "badRequest"
+    // error de sintaxis: error.name == "SyntaxError"
+    if (error.name == "SequelizeDatabaseError" || error.message == "badRequest") { 
+      ctx.response.status = httpCodes.errorsCode['badRequest']
+      ctx.body = ''
+      await next()
+    } else if (error.name == "SequelizeUniqueConstraintError"){ 
+      //caso de id ya existia de antes.(id duplicados) (no pueden existir dos con el mismo id)
+      ctx.response.status = httpCodes.errorsCode['objectConflict']
+
+      const artist = await ctx.orm.artist.findByPk(idCalculated);
+      //Calculate URLS
+      let currentURL = ctx.request.headers.host
+      let [albumsURL, tracksURL, selfURL] = calculateURLSArtist(currentURL, artist.id)
+      response = {
+        id: artist.id,
+        name: artist.name,
+        age: artist.age,
+        albums: albumsURL, //calculados aqui mismo
+        tracks: tracksURL,
+        self: selfURL
+      }
+
+      ctx.body = response
+      await next()
+     
+    } else {
+      ctx.body = ''
+      await next()
+      // console.log('otro tipo de error', error)
+      console.log("otro tipo de error:", error.name, error.message)
+
+    }
+
+    
   }
 });
 
