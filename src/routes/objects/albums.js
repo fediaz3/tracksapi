@@ -7,80 +7,98 @@ async function loadAlbum(ctx, next) {
     return next();
   }
   
+const btoaEncode = (string) => {
+  return Buffer.from(string).toString('base64')
+}
+const calculateId = (name) => {
+  idCalculated = btoaEncode(name).slice(0, 22)
+  return idCalculated // es un string
+}
   
-  //READ
-  router.get('albums.list', '/', async(ctx) => {
-    const albumsList = await ctx.orm.album.findAll();
-    // await ctx.render('albums/index', {
-    //   albumsList: albumsList,
-    //   newEventPath: ctx.router.url('albums.new'),
-    //   editEventPath: (album) => ctx.router.url('albums.edit', { id: album.id }),
-    //   deleteEventPath: (album) => ctx.router.url('albums.delete', { id: album.id })
-    // });
-  });
+const calculateURLSTrack = (currentURL, albumId, artistId, trackId) => {
+  let artistURL = `http://${currentURL}/artists/${artistId}`
+  let albumURL = `http://${currentURL}/albums/${albumId}`
+  let selfURL = `http://${currentURL}/tracks/${trackId}`
+
+  return [artistURL, albumURL, selfURL]
+
+}
+
+const calculateURLSAlbum = (currentURL, albumId, artistId) => {
+  let artistURL = `http://${currentURL}/artists/${artistId}`
+  let tracksURL = `http://${currentURL}/albums/${albumId}/tracks`
+  let selfURL = `http://${currentURL}/albums/${albumId}`
+
+  return [artistURL, tracksURL, selfURL]
+}
+
+
   
+//CREATE A TRACK IN THIS ALBUMID
+router.post('tracks.create', '/:id/tracks', loadAlbum, async (ctx, next) => {
+  const {album} = ctx.state
+  body = ctx.request.body
+  //Calculate ID
+  let name = `${body.name}:${album.id}`
+  let idCalculated = calculateId(name)
+  body.id = idCalculated //agrego el par {id: idCalculated} al body
+  body.timesPlayed = 0
+
+  // Creo el track en el orm
+  const track = await ctx.orm.track.build(body);
+  try {
+    //guardo el artista en la bd con el orm
+    await track.save({ fields: ["id", "name", "duration", "timesPlayed"]});
+    await track.setAlbum(album)
+    // console.log("asociacion hecha (album asociado):", await track.getAlbum())
+      //Calculate URLS
+    let currentURL = ctx.request.headers.host
+    let [artistURL, albumURL, selfURL] = calculateURLSTrack(currentURL, track.albumId, album.artistId, track.id)
+    response = {
+      id: track.id,
+      album_id: track.albumId,
+      name: track.name,
+      duration: track.duration,
+      times_played: track.timesPlayed,
+      artist: artistURL,
+      album: albumURL,
+      self: selfURL
+    }
+    ctx.body = response
+    await next()
+    
+  } catch (validationError) {
+    console.log("error: ", validationError)
+  }
+});
   
-  //CREATE
+
+// GET ALL ALBUMS
+router.get('albums.list', '/', async(ctx, next) => {
+  let albumsList = await ctx.orm.album.findAll();
   
-  router.get('albums.new', '/new', async (ctx) => {
-    const album = ctx.orm.album.build();
-    // await ctx.render('albums/new', {
-    //   album,
-    //   submitEventPath: ctx.router.url('albums.create'),
-    // });
-  });
+  albumsList = albumsList.map( x => { 
+    currentURL = ctx.request.headers.host;
+    let [artistURL, tracksURL, selfURL] = calculateURLSAlbum(currentURL, x.id, x.artistId)
+    return {id: x.id, artist_id: x.artistId, name: x.name, genre: x.genre,
+    artist: artistURL, tracks: tracksURL, self: selfURL}
+  })
+  //console.log("Llegamos acá")
+  ctx.body = albumsList
+  await next()
+});
   
-  //post para crear un album:
-  router.post('albums.create', '/', async (ctx) => {
-    const album = ctx.orm.album.build(ctx.request.body);
-    // try {
-    //   await album.save({ fields: ['description', 'date']});
-    //   ctx.redirect(ctx.router.url('albums.list'));
-    // } catch (validationError) {
-    //   // voy a querer pasarle denuevo la vista
-    //   await ctx.render('albums.new', {
-    //     album,
-    //     errors: validationError.errors, //errores que se depliean arriba del formulario.
-    //     submitSupplierPath: ctx.router.url('albums.create'),
-    //   });
-    // }
-  });
+
+
+
+
   
-  
-  
-  //EDIT:
-  router.get('albums.edit', '/:id/edit', loadAlbum, async (ctx) => {
-    const {album} = ctx.state;
-    // await ctx.render('albums/edit', {
-    //   album,
-    //   submitEventPath: ctx.router.url('albums.update', { id: album.id }),
-    // });
-  });
-  
-  //patch para EDIT:
-  router.patch('albums.update', '/:id', loadAlbum, async (ctx) => {
-    const {album} = ctx.state;
-    // try {
-    //   const { role, name, email, phone } = ctx.request.body;
-    //   await album.update({ role, name, email, phone });
-    //   ctx.redirect(ctx.router.url('albums.list'));
-    // } catch (validationError) {
-    //   await ctx.render('albums/edit', {
-    //     album,
-    //     errors: validationError.errors,
-    //     submitEventsPath: ctx.router.url('albums.update', { id: album.id }),
-    //   });
-    // }
-  });
-  
-  
-  
-  //DELETE:
-  router.del('albums.delete', '/:id', loadAlbum, async (ctx) => {
-    const {album} = ctx.state;
-    await album.destroy();
-    // ctx.redirect(ctx.router.url('albums.list')); // lo redirecciono a la lista de curevent
-  });
+//DELETE:
+router.del('albums.delete', '/:id', loadAlbum, async (ctx) => {
+  const {album} = ctx.state;
+  await album.destroy();
+  // ctx.redirect(ctx.router.url('albums.list')); // lo redirecciono a la lista de curevent
+});
   
 
 
