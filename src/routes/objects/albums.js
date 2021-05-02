@@ -134,6 +134,31 @@ router.get('tracks.list', '/:id/tracks', loadAlbum, async (ctx, next) => {
 
 
   
+// PLAY ALL TRACKS GIVEN <albumId>
+router.put('tracks.play', '/:id/tracks/play', loadAlbum, async (ctx, next) => {
+
+  const { album } = await ctx.state;
+
+  let tracksList = await album.getTracks()
+
+  tracksList = tracksList.map( async (x) => { 
+    // Reproducir el track:
+    let trackIncremented = await x.increment('timesPlayed', {by: 1})
+    // console.log("TrackIncremented:", trackIncremented) // es solo para verlo que se hizo
+  })
+
+  try {
+    ctx.body = ''
+    await next()
+  } catch (validationError) {
+    console.log("error: ", validationError)
+  }
+});
+
+
+
+
+
 //DELETE ALBUM:
 router.del('albums.delete', '/:id', loadAlbum, async (ctx, next) => {
   const {album} = ctx.state
