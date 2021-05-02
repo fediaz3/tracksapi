@@ -120,13 +120,14 @@ router.post('artists.create', '/', async (ctx, next) => {
 
 //DELETE ARTIST:
 router.del('artists.delete', '/:id', loadArtist, async (ctx) => {
-  const {artist} = await ctx.state;
+  const {artist} = ctx.state;
   try {
-    await artist.destroy();
-  }
-  catch (validationError){
+    await artist.destroy(); //borra en cascada, pero tira un 404 nosé porqué
+  // pendiente revisar.
+  } catch (validationError){
     console.log("error:", validationError) 
-    //asi cuando no hay nadie no se cae la pgina AQUI ME FALTA TIRAR UN 404 o mensajito
+    // TypeError Cannot read property 'destroy' of null //asi no se se cae cuando 
+    // se trata de eliminar cuando no hay artistas.
   }
   
 });
@@ -179,8 +180,6 @@ router.post('artists.create', '/:id/albums', loadArtist, async (ctx, next) => {
 
 
 // GET ALBUMS FROM THIS ARTIST <artistId>
-
-//aqui voy:
 router.get('albums.create', '/:id/albums', loadArtist, async (ctx, next) => {
   const { artist } = await ctx.state;
   let albumsList = await artist.getAlbums()
