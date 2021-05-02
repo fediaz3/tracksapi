@@ -222,29 +222,38 @@ router.get('tracks.list', '/:id/tracks', loadArtist, async (ctx, next) => {
     times_played: x.timesPlayed, artist: artistURL, album: albumURL, self: selfURL}
   })
 
-  ctx.body = tracksList
-  await next()
+  try {
+    ctx.body = tracksList
+    await next()
+  } catch (validationError) {
+    console.log("error: ", validationError)
+  }
 });
 
 
 
-// reproduir las canciones de todos los albums del artista <artista_id>
 
+// PLAY ALL TRACKS FROM THIS ARTIST_ID( FROM ALL ALBUMS)
 router.put('tracks.play', '/:id/albums/play', loadArtist, async (ctx, next) => {
   const { artist } = await ctx.state;
-  console.log("reproducir")
 
-  // PENDIENTE: DPS DE CREAR LAS CANCIONES, LES PUEDO AUMENTAR EL TIMESPLAYED,
+  let albumsList = await artist.getAlbums()
+
+  tracksListPromises = albumsList.map( async(x) => await x.getTracks())
+  let tracksList = await Promise.all(tracksListPromises)
+
+  tracksList = tracksList[0].map( async (x) => { 
+    // Reproducir el track:
+    let trackIncremented = await x.increment('timesPlayed', {by: 1})
+    // console.log("TrackIncremented:", trackIncremented) // es solo para verlo que se hizo
+  })
 
   try {
     ctx.body = ''
     await next()
-    // ctx.redirect(ctx.router.url(`artists.list/${1}`));
   } catch (validationError) {
     console.log("error: ", validationError)
   }
-
-
 });
 
 
