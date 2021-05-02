@@ -27,15 +27,17 @@ const calculateURLSAlbum = (currentURL, albumId, artistId) => {
   return [artistURL, tracksURL, selfURL]
 }
 
-// Aun no la uso:
-// const calculateURLSTrack = (currentURL, albumId, artistId, trackId) => {
-//   let artistURL = `http://${currentURL}/${artistId}`
-//   let albumURL = `http://${currentURL}/${albumId}`
-//   let selfURL = `http://${currentURL}/${trackId}`
-// 
-//   return [artistURL, albumURL, selfURL]
-// 
-// }
+  
+const calculateURLSTrack = (currentURL, albumId, artistId, trackId) => {
+  let artistURL = `http://${currentURL}/artists/${artistId}`
+  let albumURL = `http://${currentURL}/albums/${albumId}`
+  let selfURL = `http://${currentURL}/tracks/${trackId}`
+
+  return [artistURL, albumURL, selfURL]
+
+}
+
+
 
 
 async function loadArtist (ctx, next) {
@@ -205,20 +207,23 @@ router.get('albums.create', '/:id/albums', loadArtist, async (ctx, next) => {
 
 // GET ALL TRACKS FROM THIS ARTIST.
 // AQUI VOY*****************************************************************************
-router.get('albums.create', '/:id/tracks', loadArtist, async (ctx, next) => {
+router.get('tracks.list', '/:id/tracks', loadArtist, async (ctx, next) => {
   const { artist } = await ctx.state;
-  // let albumsList = await artist.getAlbums()
-// 
-  // tracksListPromises = albumsList.map( async(x) => {return await x.getTracks()})
-  // console.log("Llegamos acá:", tracksListPromises)
-// 
-  // Promise.all(tracksListPromises).then( async(response) => {
-  //   console.log("response:", response)
-  //   ctx.body = response
-  //   await next()
-  // })
-  
 
+  let albumsList = await artist.getAlbums()
+
+  tracksListPromises = albumsList.map( async(x) => await x.getTracks())
+  let tracksList = await Promise.all(tracksListPromises)
+
+  tracksList = tracksList[0].map( x => { 
+    let currentURL = ctx.request.headers.host;
+    let [artistURL, albumURL, selfURL] = calculateURLSTrack(currentURL, x.albumId, artist.id, x.id)
+    return {id: x.id, album_id: x.albumId, name: x.name, duration: x.duration,
+    times_played: x.timesPlayed, artist: artistURL, album: albumURL, self: selfURL}
+  })
+
+  ctx.body = tracksList
+  await next()
 });
 
 
