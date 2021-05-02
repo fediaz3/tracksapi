@@ -134,8 +134,8 @@ router.get('tracks.list', '/:id/tracks', loadAlbum, async (ctx, next) => {
 
 
   
-//DELETE:
-router.del('tracks.delete', '/:id', loadAlbum, async (ctx, next) => {
+//DELETE ALBUM:
+router.del('albums.delete', '/:id', loadAlbum, async (ctx, next) => {
   const {album} = ctx.state
   try {
     await album.destroy(); 

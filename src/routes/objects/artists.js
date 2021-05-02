@@ -203,6 +203,24 @@ router.get('albums.create', '/:id/albums', loadArtist, async (ctx, next) => {
 });
 
 
+// GET ALL TRACKS FROM THIS ARTIST.
+// AQUI VOY*****************************************************************************
+router.get('albums.create', '/:id/tracks', loadArtist, async (ctx, next) => {
+  const { artist } = await ctx.state;
+  // let albumsList = await artist.getAlbums()
+// 
+  // tracksListPromises = albumsList.map( async(x) => {return await x.getTracks()})
+  // console.log("Llegamos acá:", tracksListPromises)
+// 
+  // Promise.all(tracksListPromises).then( async(response) => {
+  //   console.log("response:", response)
+  //   ctx.body = response
+  //   await next()
+  // })
+  
+
+});
+
 
 
 // reproduir las canciones de todos los albums del artista <artista_id>
@@ -212,7 +230,7 @@ router.put('tracks.play', '/:id/albums/play', loadArtist, async (ctx, next) => {
   console.log("reproducir")
 
   // PENDIENTE: DPS DE CREAR LAS CANCIONES, LES PUEDO AUMENTAR EL TIMESPLAYED,
-  
+
   try {
     ctx.body = ''
     await next()
