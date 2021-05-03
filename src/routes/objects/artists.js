@@ -14,27 +14,27 @@ const calculateId = (name) => {
 }
 
 const calculateURLSArtist = (currentURL, artistId) => {
-  let albumsURL = `http://${currentURL}/artists/${artistId}/albums`
-  let tracksURL = `http://${currentURL}/artists/${artistId}/tracks`
-  let selfURL = `http://${currentURL}/artists/${artistId}`
+  let albumsURL = `https://${currentURL}/artists/${artistId}/albums`
+  let tracksURL = `https://${currentURL}/artists/${artistId}/tracks`
+  let selfURL = `https://${currentURL}/artists/${artistId}`
 
   return [albumsURL, tracksURL, selfURL]
 
 }
 
 const calculateURLSAlbum = (currentURL, albumId, artistId) => {
-  let artistURL = `http://${currentURL}/artists/${artistId}`
-  let tracksURL = `http://${currentURL}/albums/${albumId}/tracks`
-  let selfURL = `http://${currentURL}/albums/${albumId}`
+  let artistURL = `https://${currentURL}/artists/${artistId}`
+  let tracksURL = `https://${currentURL}/albums/${albumId}/tracks`
+  let selfURL = `https://${currentURL}/albums/${albumId}`
 
   return [artistURL, tracksURL, selfURL]
 }
 
   
 const calculateURLSTrack = (currentURL, albumId, artistId, trackId) => {
-  let artistURL = `http://${currentURL}/artists/${artistId}`
-  let albumURL = `http://${currentURL}/albums/${albumId}`
-  let selfURL = `http://${currentURL}/tracks/${trackId}`
+  let artistURL = `https://${currentURL}/artists/${artistId}`
+  let albumURL = `https://${currentURL}/albums/${albumId}`
+  let selfURL = `https://${currentURL}/tracks/${trackId}`
 
   return [artistURL, albumURL, selfURL]
 

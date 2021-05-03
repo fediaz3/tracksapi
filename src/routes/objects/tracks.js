@@ -9,9 +9,9 @@ async function loadTrack(ctx, next) {
   }
 
 const calculateURLSTrack = (currentURL, albumId, artistId, trackId) => {
-  let artistURL = `http://${currentURL}/artists/${artistId}`
-  let albumURL = `http://${currentURL}/albums/${albumId}`
-  let selfURL = `http://${currentURL}/tracks/${trackId}`
+  let artistURL = `https://${currentURL}/artists/${artistId}`
+  let albumURL = `https://${currentURL}/albums/${albumId}`
+  let selfURL = `https://${currentURL}/tracks/${trackId}`
 
   return [artistURL, albumURL, selfURL]
 }
