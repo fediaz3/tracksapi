@@ -85,5 +85,6 @@ mailer(app);
 
 // Routing middleware
 app.use(routes.routes());
+app.use(routes.allowedMethods())
 
 module.exports = app;
