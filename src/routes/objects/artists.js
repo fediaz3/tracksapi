@@ -1,5 +1,8 @@
 const KoaRouter = require('koa-router'); // para pedir la libreria koa-router
+const { number } = require('prop-types');
 const router = new KoaRouter();          // creo un router
+
+const httpCodes = require('./httpCodes')
 
 
 const btoaEncode = (string) => {
@@ -64,33 +67,67 @@ router.get('artists.list', '/', async(ctx, next) => {
 router.get('artists.list', '/:id', loadArtist, async(ctx, next) => {
   // console.log("Llegamos acá 2")
   let { artist } = await ctx.state
-  currentURL = ctx.request.headers.host;
-  let [albumsURL, tracksURL, selfURL] = calculateURLSArtist(currentURL, artist.id)
 
-  artist = { 
-    id: artist.id, name: artist.name, age: artist.age, 
-    albums: albumsURL, tracks: tracksURL, self: selfURL
+  try {
+    if (artist == null ){
+      throw new TypeError('objectDoesNotExist')
+    }
+    currentURL = ctx.request.headers.host;
+    let [albumsURL, tracksURL, selfURL] = calculateURLSArtist(currentURL, artist.id)
+  
+    artist = { 
+      id: artist.id, name: artist.name, age: artist.age, 
+      albums: albumsURL, tracks: tracksURL, self: selfURL
+    }
+    ctx.body = artist
+    ctx.response.status = httpCodes.successCode['ok'] // 200
+    await next()
+    
+  } catch (error) {
+    if (error.message == "objectDoesNotExist"){
+      console.log("no existe el artista")
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
+    }
+    
   }
-  ctx.body = artist
-  await next()
+  
 });
 
 
 //CREATE ARTIST
 router.post('artists.create', '/', async (ctx, next) => {
   
-  body = ctx.request.body
-  // console.log("body que llega:", body, typeof(body))
-  //Calculate ID
-  let name = body.name
-  let idCalculated = calculateId(name)
-  body.id = idCalculated //agrego el par {id: idCalculated} al body
-
-  // Creo el artista en el ORM
-  const artist = await ctx.orm.artist.build(body);
-  // console.log("artista previoa c rear:", artist)
-  
   try {
+    body = ctx.request.body
+
+    //Chequeando el input (tipos de datos) dados en el body
+    if (body.name == undefined || body.age == undefined 
+      || typeof(body.name) != 'string' || typeof(body.age) != 'number'){
+      throw new Error("badRequest")
+      
+    }
+    if (typeof(body.age) == 'number'){ //para sacar los "floats" en javascript
+      if (Number.isInteger(body.age) === false ){
+        throw new Error("badRequest")
+      }
+    }
+
+    // console.log("body que llega:", body, typeof(body))
+    //Calculate ID
+    let name = body.name
+    let idCalculated = calculateId(name)
+    body.id = idCalculated //agrego el par {id: idCalculated} al body
+  
+    // Creo el artista en el ORM
+    const artist = await ctx.orm.artist.build(body);
+    
     //guardo el artista en la bd con el orm
     await artist.save({ fields: ["id", "name", "age"]});
   
@@ -108,16 +145,46 @@ router.post('artists.create', '/', async (ctx, next) => {
       self: selfURL
     }
     ctx.body = response
+    ctx.response.status = httpCodes.successCode['objectCreated']
     await next()
-    // ctx.redirect(ctx.router.url(`artists.list/${1}`));
-  } catch (validationError) {
-    console.log("error: ", validationError.errors)
-    // voy a querer pasarle denuevo la vista
-    // await ctx.render('artists.new', {
-    //   artist,
-    //   errors: validationError.errors, //errores que se depliean arriba del formulario.
-    //   submitSupplierPath: ctx.router.url('artists.create'),
-    // });
+
+  } catch (error) {
+    //formato incorrecto en el input dado: error.name == "SequelizeDatabaseError" 
+    // faltan campos: error.message == "badRequest"
+    // error de sintaxis: error.name == "SyntaxError"
+    if (error.name == "SequelizeDatabaseError" || error.message == "badRequest") { 
+      ctx.response.status = httpCodes.errorsCode['badRequest']
+      ctx.body = ''
+      await next()
+    } else if (error.name == "SequelizeUniqueConstraintError"){ 
+      //caso de id ya existia de antes.(id duplicados) (no pueden existir dos con el mismo id)
+      ctx.response.status = httpCodes.errorsCode['objectConflict']
+
+      const artist = await ctx.orm.artist.findByPk(idCalculated);
+      //Calculate URLS
+      let currentURL = ctx.request.headers.host
+      let [albumsURL, tracksURL, selfURL] = calculateURLSArtist(currentURL, artist.id)
+      response = {
+        id: artist.id,
+        name: artist.name,
+        age: artist.age,
+        albums: albumsURL, //calculados aqui mismo
+        tracks: tracksURL,
+        self: selfURL
+      }
+
+      ctx.body = response
+      await next()
+     
+    } else {
+      ctx.body = ''
+      await next()
+      // console.log('otro tipo de error', error)
+      console.log("otro tipo de error:", error.name, error.message)
+
+    }
+
+    
   }
 });
 
@@ -125,19 +192,29 @@ router.post('artists.create', '/', async (ctx, next) => {
 router.del('artists.delete', '/:id', loadArtist, async (ctx, next) => {
   const {artist} = ctx.state;
   try {
-    await artist.destroy(); 
-    // estas dos lineas de abajo, son clave para que no tire el 404, 
-    // cuando no corresponde 
-    // esta raro, pero sirve
-    ctx.body = ''
-    await next() 
-    //sin estas dos lineas tira 404, inclusive si borró bien el artista.
+    if (artist == null) { //Si el album no existe de antes -> lanzar un error 404
+      throw new TypeError('objectDoesNotExist')
+    } 
 
-  // pendiente revisar.
-  } catch (validationError){
-    console.log("error:", validationError) 
-    // TypeError Cannot read property 'destroy' of null //asi no se se cae cuando 
-    // se trata de eliminar cuando no hay artistas.
+    await artist.destroy(); 
+    ctx.body = ''
+    ctx.response.status = httpCodes.successCode['objectDeleted']
+    await next() 
+
+  
+  } catch (error){
+    if (error.message == "objectDoesNotExist"){
+      console.log("no existe el objeto")
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
+    }
+    
   }
   
 });
@@ -150,15 +227,25 @@ router.del('artists.delete', '/:id', loadArtist, async (ctx, next) => {
 // CREATE ALBUM TO THIS ARTIST.
 router.post('artists.create', '/:id/albums', loadArtist, async (ctx, next) => {
   const { artist } = await ctx.state;
-  body = ctx.request.body
-  //Calculate ID
-  let name = `${body.name}:${artist.id}`
-  let idCalculated = calculateId(name)
-  body.id = idCalculated //agrego el par {id: idCalculated} al body
-  // Creo el artista en el ORM
-  const album = await ctx.orm.album.build(body);
-
+  
   try {
+    body = ctx.request.body
+
+    if (artist == null){
+      throw new TypeError('objectContainerDoesNotExist')
+    }
+
+    if (typeof(body.name) != 'string' || typeof(body.genre) != 'string'){
+      throw new Error("badRequest")
+    }
+
+    //Calculate ID
+    let name = `${body.name}:${artist.id}`
+    let idCalculated = calculateId(name)
+    body.id = idCalculated //agrego el par {id: idCalculated} al body
+    // Creo el artista en el ORM
+    const album = await ctx.orm.album.build(body);
+
     //guardo el artista en la bd con el orm
     await album.save({ fields: ["id", "name", "genre"]});
     // Hago la asociacion: agrego el artistId, en la fila del album actual. en la tabla albums
@@ -180,10 +267,54 @@ router.post('artists.create', '/:id/albums', loadArtist, async (ctx, next) => {
       self: selfURL
     }
     ctx.body = response
+    ctx.response.status = httpCodes.successCode['objectCreated']
     await next()
 
-  } catch (validationError) {
-    console.log("error: ", validationError.errors)
+  } catch (error) {
+    //formato incorrecto en el input dado: error.name == "SequelizeDatabaseError" 
+    // faltan campos: error.message == "badRequest"
+    // error.name == "SequelizeUniqueConstraintError": cuando hay duplicados.
+    // error.message = "objectDoesNotExist", es cuando el artistId dado no existe
+
+    if (error.name == "SequelizeDatabaseError" || error.message == "badRequest") { 
+      ctx.response.status = httpCodes.errorsCode['badRequest']
+      ctx.body = ''
+      await next()
+    } else if (error.name == "SequelizeUniqueConstraintError"){
+      
+      //caso de id ya existia de antes.(id duplicados) (no pueden existir dos con el mismo id)
+      ctx.response.status = httpCodes.errorsCode['objectConflict']
+
+      const album = await ctx.orm.album.findByPk(idCalculated);
+      let currentURL = ctx.request.headers.host
+      let [artistURL, tracksURL, selfURL] = calculateURLSAlbum(currentURL, album.id, artist.id)
+      // console.log(idCalculated, name, age, selfURL, albumsURL, tracksURL)
+      response = {
+        id: album.id,
+        artist_id: album.artistId, 
+        name: album.name,
+        genre: album.genre,
+        artist: artistURL, 
+        tracks: tracksURL,
+        self: selfURL
+      }
+      ctx.body = response
+      
+      await next()
+     
+    } else if (error.message = "objectContainerDoesNotExist"){
+      // console.log("errorcito:", error.name, error.message) 
+      ctx.response.status = httpCodes.errorsCode['objectContainerDoesNotExist']
+      ctx.body = ''
+      await next()
+
+    } else {
+      ctx.body = ''
+      await next()
+      // console.log('otro tipo de error', error)
+      console.log("otro tipo de error:", error.name, error.message)
+
+    }
   }
 });
 
@@ -192,17 +323,37 @@ router.post('artists.create', '/:id/albums', loadArtist, async (ctx, next) => {
 // GET ALBUMS given <artistId>
 router.get('albums.create', '/:id/albums', loadArtist, async (ctx, next) => {
   const { artist } = await ctx.state;
-  let albumsList = await artist.getAlbums()
 
-  albumsList = albumsList.map( x => { 
-    let currentURL = ctx.request.headers.host;
-    let [artistURL, tracksURL, selfURL] = calculateURLSAlbum(currentURL, x.id, artist.id)
-    return {id: x.id, artist_id: x.artistId, name: x.name, genre: x.genre, 
-      artist: artistURL, tracks: tracksURL, self: selfURL}
-  })
-  //console.log("Llegamos acá")
-  ctx.body = albumsList
-  await next()
+  try {
+    if (artist == null){
+      throw new TypeError('objectDoesNotExist')
+    }
+    let albumsList = await artist.getAlbums()
+  
+    albumsList = albumsList.map( x => { 
+      let currentURL = ctx.request.headers.host;
+      let [artistURL, tracksURL, selfURL] = calculateURLSAlbum(currentURL, x.id, artist.id)
+      return {id: x.id, artist_id: x.artistId, name: x.name, genre: x.genre, 
+        artist: artistURL, tracks: tracksURL, self: selfURL}
+    })
+    //console.log("Llegamos acá")
+    ctx.body = albumsList
+    await next()
+  } catch (error){
+    if (error.message == "objectDoesNotExist"){
+      // console.log("no existe el album")
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+      
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
+    }
+  }
+  
 
 });
 
@@ -211,23 +362,39 @@ router.get('albums.create', '/:id/albums', loadArtist, async (ctx, next) => {
 router.get('tracks.list', '/:id/tracks', loadArtist, async (ctx, next) => {
   const { artist } = await ctx.state;
 
-  let albumsList = await artist.getAlbums()
-
-  tracksListPromises = albumsList.map( async(x) => await x.getTracks())
-  let tracksList = await Promise.all(tracksListPromises)
-
-  tracksList = tracksList[0].map( x => { 
-    let currentURL = ctx.request.headers.host;
-    let [artistURL, albumURL, selfURL] = calculateURLSTrack(currentURL, x.albumId, artist.id, x.id)
-    return {id: x.id, album_id: x.albumId, name: x.name, duration: x.duration,
-    times_played: x.timesPlayed, artist: artistURL, album: albumURL, self: selfURL}
-  })
-
   try {
+    if (artist == null){
+      throw new TypeError('objectDoesNotExist')
+    }
+  
+    let albumsList = await artist.getAlbums()
+  
+    tracksListPromises = albumsList.map( async(x) => await x.getTracks())
+    let tracksList = await Promise.all(tracksListPromises)
+  
+    tracksList = tracksList[0].map( x => { 
+      let currentURL = ctx.request.headers.host;
+      let [artistURL, albumURL, selfURL] = calculateURLSTrack(currentURL, x.albumId, artist.id, x.id)
+      return {id: x.id, album_id: x.albumId, name: x.name, duration: x.duration,
+      times_played: x.timesPlayed, artist: artistURL, album: albumURL, self: selfURL}
+    })
+
     ctx.body = tracksList
     await next()
-  } catch (validationError) {
-    console.log("error: ", validationError)
+
+  } catch (error) {
+    if (error.message == "objectDoesNotExist"){
+      // console.log("no existe el artista")
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+      
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
+    }
   }
 });
 
@@ -238,51 +405,43 @@ router.get('tracks.list', '/:id/tracks', loadArtist, async (ctx, next) => {
 router.put('tracks.play', '/:id/albums/play', loadArtist, async (ctx, next) => {
   const { artist } = await ctx.state;
 
-  let albumsList = await artist.getAlbums()
-
-  tracksListPromises = albumsList.map( async(x) => await x.getTracks())
-  let tracksList = await Promise.all(tracksListPromises)
-
-  tracksList = tracksList[0].map( async (x) => { 
-    // Reproducir el track:
-    let trackIncremented = await x.increment('timesPlayed', {by: 1})
-    // console.log("TrackIncremented:", trackIncremented) // es solo para verlo que se hizo
-  })
-
   try {
+    if (artist == null){ //notar que esto es solo si no existe el artista de artistID
+      // en otros casos va tirar 200 de todas formas.(aunque no tenga tracks)
+      throw new TypeError('objectDoesNotExist')
+    }
+  
+    let albumsList = await artist.getAlbums()
+  
+    tracksListPromises = albumsList.map( async(x) => await x.getTracks())
+    let tracksList = await Promise.all(tracksListPromises)
+  
+    tracksList = tracksList[0].map( async (x) => { 
+      // Reproducir el track:
+      let trackIncremented = await x.increment('timesPlayed', {by: 1})
+      // console.log("TrackIncremented:", trackIncremented) // es solo para verlo que se hizo
+    })
+
     ctx.body = ''
+    ctx.response.status = httpCodes.successCode['ok'] //retorna 200
     await next()
-  } catch (validationError) {
-    console.log("error: ", validationError)
+  } catch (error) {
+    if (error.message == "objectDoesNotExist") {
+      console.log('artista no encontrado')
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
+    }
   }
 });
 
 
 
-//EDIT:
-// router.get('artists.edit', '/:id/edit', loadArtist, async (ctx) => {
-//   const {artist} = ctx.state;
-//   // await ctx.render('artists/edit', {
-//   //   artist,
-//   //   submitEventPath: ctx.router.url('artists.update', { id: artist.id }),
-//   // });
-// });
-// 
-// //patch para EDIT:
-// router.patch('artists.update', '/:id', loadArtist, async (ctx) => {
-//   const {artist} = ctx.state;
-//   // try {
-//   //   const { role, name, email, phone } = ctx.request.body;
-//   //   await artist.update({ role, name, email, phone });
-//   //   ctx.redirect(ctx.router.url('artists.list'));
-//   // } catch (validationError) {
-//   //   await ctx.render('artists/edit', {
-//   //     artist,
-//   //     errors: validationError.errors,
-//   //     submitEventsPath: ctx.router.url('artists.update', { id: artist.id }),
-//   //   });
-//   // }
-// });
 
 
 

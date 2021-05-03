@@ -1,6 +1,7 @@
 const KoaRouter = require('koa-router'); // para pedir la libreria koa-router
 const router = new KoaRouter();          // creo un router
 
+const httpCodes = require('./httpCodes')
 
 async function loadTrack(ctx, next) {
     ctx.state.track = await ctx.orm.track.findByPk(ctx.params.id);
@@ -42,27 +43,43 @@ router.get('tracks.list', '/', async(ctx, next) => {
 // GET TRACK given TrackId
 router.get('albums.list', '/:id', loadTrack, async(ctx, next) => {
   let { track } = await ctx.state
-  let album  = await track.getAlbum()
-  let artist = await album.getArtist()
 
-  currentURL = ctx.request.headers.host;
-  let [artistURL, albumURL, selfURL] = calculateURLSTrack(currentURL, track.albumId, artist.id, track.id)
-
-  track = { //asi omito el id, y le agrego las URLS
-    id: track.id,
-    album_id: track.albumId,
-    name: track.name,
-    duration: track.duration,
-    times_played: track.timesPlayed,
-    artist: artistURL,
-    album: albumURL,
-    self: selfURL
-  }
+  
   try {
+    if (track == null){
+      throw new TypeError('objectDoesNotExist')
+    }
+    let album  = await track.getAlbum()
+    let artist = await album.getArtist()
+  
+    currentURL = ctx.request.headers.host;
+    let [artistURL, albumURL, selfURL] = calculateURLSTrack(currentURL, track.albumId, artist.id, track.id)
+  
+    track = { //asi omito el id, y le agrego las URLS
+      id: track.id,
+      album_id: track.albumId,
+      name: track.name,
+      duration: track.duration,
+      times_played: track.timesPlayed,
+      artist: artistURL,
+      album: albumURL,
+      self: selfURL
+    }
+
     ctx.body = track
     await next()
-  } catch(validationError){
-    console.log("error:", validationError)
+  } catch(error){
+    if (error.message == "objectDoesNotExist"){
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+      // console.log("no existe el objecto")
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
+    }
   }
   
 });
@@ -74,15 +91,28 @@ router.get('albums.list', '/:id', loadTrack, async(ctx, next) => {
 router.put('tracks.play', '/:id/play', loadTrack, async (ctx, next) => {
   const { track } = await ctx.state;
 
-  let trackIncremented = await track.increment('timesPlayed', {by: 1})
-  // console.log("Track Incremented:", track)
-
   try {
+    if (track == null){
+      throw new TypeError('objectDoesNotExist')
+    }
+    let trackIncremented = await track.increment('timesPlayed', {by: 1})
+    // console.log("Track Incremented:", track)
     ctx.body = ''
+    ctx.response.status = httpCodes.successCode['ok'] //retorna 200
     await next()
-  } catch (validationError) {
-    console.log("error: ", validationError)
+  } catch (error) {
+    if (error.message == "objectDoesNotExist") {
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
+    }
   }
+
 });
 
   
@@ -90,11 +120,25 @@ router.put('tracks.play', '/:id/play', loadTrack, async (ctx, next) => {
 router.del('tracks.delete', '/:id', loadTrack, async (ctx, next) => {
   const { track } = ctx.state;
   try {
+    if (track == null) { //Si el track no existe antes -> lanzar un error 404
+      throw new TypeError('objectDoesNotExist')
+    } 
     await track.destroy(); 
     ctx.body = ''
+    ctx.response.status = httpCodes.successCode['objectDeleted']
     await next() 
-  } catch (validationError){
-    console.log("error:", validationError) 
+  } catch (error){
+    if (error.message == "objectDoesNotExist"){
+      ctx.body = ''
+      ctx.response.status = httpCodes.errorsCode[error.message] //retorna 404
+      await next()
+      // console.log("no existe el objecto")
+    } else {
+      //En caso de otros errores, que no estén en los IF's
+      //console.log("error no manejado:", error)
+      ctx.body = ''
+      await next()
+    }
   }
 });
   
