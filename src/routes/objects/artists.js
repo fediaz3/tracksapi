@@ -227,15 +227,25 @@ router.del('artists.delete', '/:id', loadArtist, async (ctx, next) => {
 // CREATE ALBUM TO THIS ARTIST.
 router.post('artists.create', '/:id/albums', loadArtist, async (ctx, next) => {
   const { artist } = await ctx.state;
-  body = ctx.request.body
-  //Calculate ID
-  let name = `${body.name}:${artist.id}`
-  let idCalculated = calculateId(name)
-  body.id = idCalculated //agrego el par {id: idCalculated} al body
-  // Creo el artista en el ORM
-  const album = await ctx.orm.album.build(body);
-
+  
   try {
+    body = ctx.request.body
+
+    if (artist == null){
+      throw new TypeError('objectContainerDoesNotExist')
+    }
+
+    if (typeof(body.name) != 'string' || typeof(body.genre) != 'string'){
+      throw new Error("badRequest")
+    }
+
+    //Calculate ID
+    let name = `${body.name}:${artist.id}`
+    let idCalculated = calculateId(name)
+    body.id = idCalculated //agrego el par {id: idCalculated} al body
+    // Creo el artista en el ORM
+    const album = await ctx.orm.album.build(body);
+
     //guardo el artista en la bd con el orm
     await album.save({ fields: ["id", "name", "genre"]});
     // Hago la asociacion: agrego el artistId, en la fila del album actual. en la tabla albums
@@ -257,10 +267,54 @@ router.post('artists.create', '/:id/albums', loadArtist, async (ctx, next) => {
       self: selfURL
     }
     ctx.body = response
+    ctx.response.status = httpCodes.successCode['objectCreated']
     await next()
 
-  } catch (validationError) {
-    console.log("error: ", validationError.errors)
+  } catch (error) {
+    //formato incorrecto en el input dado: error.name == "SequelizeDatabaseError" 
+    // faltan campos: error.message == "badRequest"
+    // error.name == "SequelizeUniqueConstraintError": cuando hay duplicados.
+    // error.message = "objectDoesNotExist", es cuando el artistId dado no existe
+
+    if (error.name == "SequelizeDatabaseError" || error.message == "badRequest") { 
+      ctx.response.status = httpCodes.errorsCode['badRequest']
+      ctx.body = ''
+      await next()
+    } else if (error.name == "SequelizeUniqueConstraintError"){
+      
+      //caso de id ya existia de antes.(id duplicados) (no pueden existir dos con el mismo id)
+      ctx.response.status = httpCodes.errorsCode['objectConflict']
+
+      const album = await ctx.orm.album.findByPk(idCalculated);
+      let currentURL = ctx.request.headers.host
+      let [artistURL, tracksURL, selfURL] = calculateURLSAlbum(currentURL, album.id, artist.id)
+      // console.log(idCalculated, name, age, selfURL, albumsURL, tracksURL)
+      response = {
+        id: album.id,
+        artist_id: album.artistId, 
+        name: album.name,
+        genre: album.genre,
+        artist: artistURL, 
+        tracks: tracksURL,
+        self: selfURL
+      }
+      ctx.body = response
+      
+      await next()
+     
+    } else if (error.message = "objectContainerDoesNotExist"){
+      // console.log("errorcito:", error.name, error.message) 
+      ctx.response.status = httpCodes.errorsCode['objectContainerDoesNotExist']
+      ctx.body = ''
+      await next()
+
+    } else {
+      ctx.body = ''
+      await next()
+      // console.log('otro tipo de error', error)
+      console.log("otro tipo de error:", error.name, error.message)
+
+    }
   }
 });
 
