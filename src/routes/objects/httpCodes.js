@@ -2,7 +2,7 @@ const errorsCode = {
     'objectDoesNotExist': 404, //404: Not Found
     'objectConflict': 409, // 409: Conflict
     'badRequest': 400, // 400: Bad Request
-    'doesNotExistTheArtistForThisAlbum': 422, // 422: Unprocessable Entity.
+    'objectContainerDoesNotExist': 422, // 422: Unprocessable Entity.
 }
 
 const successCode = {
